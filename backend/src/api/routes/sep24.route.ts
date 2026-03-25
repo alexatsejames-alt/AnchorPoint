@@ -26,7 +26,6 @@ interface DepositResponse {
 /**
  * POST /transactions/deposit/interactive
  * SEP-24 Interactive Deposit Endpoint
- * Returns a URL for the user to complete KYC/Deposit
  */
 router.post('/transactions/deposit/interactive', (req: Request, res: Response) => {
   const { asset_code, account, amount, lang = 'en' }: DepositRequest = req.body;
