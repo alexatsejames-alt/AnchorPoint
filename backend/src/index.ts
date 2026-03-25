@@ -22,6 +22,9 @@ app.get('/', (req: Request, res: Response) => {
   res.send('AnchorPoint Backend API is running.');
 });
 
+// SEP-24 routes
+app.use('/sep24', sep24Router);
+
 /* istanbul ignore next */
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => {
