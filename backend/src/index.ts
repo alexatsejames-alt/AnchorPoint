@@ -5,6 +5,7 @@ import { errorHandler } from './api/middleware/error.middleware';
 import logger from './utils/logger';
 import transactionsRouter from './api/routes/transactions.route';
 import sep24Router from './api/routes/sep24.route';
+import infoRouter from './api/routes/info.route';
 
 dotenv.config();
 
@@ -15,6 +16,9 @@ app.use(cors());
 app.use(express.json());
 
 app.use('/api/transactions', transactionsRouter);
+
+// SEP-1 Info endpoint
+app.use('/info', infoRouter);
 
 app.get('/health', (req: Request, res: Response) => {
   res.json({ status: 'UP', timestamp: new Date().toISOString() });
