@@ -45,3 +45,7 @@ Merging PR #77: feat: add prometheus metrics and monitoring
 Conflict merging PR #77, resolving by accepting both...
 Resolving conflict in backend/package.json
 Resolving conflict in backend/src/index.ts
+Successfully resolved and merged PR #77
+Merging PR #76: feat: add c2c call wrapper utility
+Conflict merging PR #76, resolving by accepting both...
+Resolving conflict in src/utils/Cargo.toml
