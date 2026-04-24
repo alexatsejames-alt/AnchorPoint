@@ -12,7 +12,9 @@
 
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, Env, String, Vec, Map};
+use soroban_sdk::{
+    contract, contractimpl, contracttype, symbol_short, Address, Env, Map, String, Vec,
+};
 
 // ============================================================================
 // Storage Keys
@@ -117,13 +119,25 @@ pub enum NftEvent {
     /// Emitted when an NFT is minted
     Minted { token_id: u64, to: Address },
     /// Emitted when an NFT is transferred
-    Transferred { token_id: u64, from: Address, to: Address },
+    Transferred {
+        token_id: u64,
+        from: Address,
+        to: Address,
+    },
     /// Emitted when metadata is updated
     MetadataUpdated { token_id: u64 },
     /// Emitted when approval is granted
-    Approved { token_id: u64, owner: Address, approved: Address },
+    Approved {
+        token_id: u64,
+        owner: Address,
+        approved: Address,
+    },
     /// Emitted when operator approval is set
-    OperatorApprovalSet { owner: Address, operator: Address, approved: bool },
+    OperatorApprovalSet {
+        owner: Address,
+        operator: Address,
+        approved: bool,
+    },
 }
 
 // ============================================================================
@@ -172,7 +186,9 @@ impl NftMetadataContract {
         };
 
         env.storage().instance().set(&DataKey::Admin, &admin);
-        env.storage().instance().set(&DataKey::CollectionMetadata, &collection);
+        env.storage()
+            .instance()
+            .set(&DataKey::CollectionMetadata, &collection);
         env.storage().instance().set(&DataKey::TokenCounter, &0u64);
     }
 
@@ -241,14 +257,17 @@ impl NftMetadataContract {
             is_mutable,
         };
 
-        env.storage().instance().set(&DataKey::NftMetadata(token_id), &metadata);
-        env.storage().instance().set(&DataKey::TokenOwner(token_id), &to);
-        env.storage().instance().set(&DataKey::TokenCounter, &token_id);
+        env.storage()
+            .instance()
+            .set(&DataKey::NftMetadata(token_id), &metadata);
+        env.storage()
+            .instance()
+            .set(&DataKey::TokenOwner(token_id), &to);
+        env.storage()
+            .instance()
+            .set(&DataKey::TokenCounter, &token_id);
 
-        env.events().publish(
-            (symbol_short!("mint"), token_id),
-            to,
-        );
+        env.events().publish((symbol_short!("mint"), token_id), to);
 
         token_id
     }
@@ -278,7 +297,10 @@ impl NftMetadataContract {
             .expect("admin not found");
 
         assert!(minter == admin, "only admin can mint");
-        assert!(metadata.royalty_percentage <= 10000, "royalty exceeds maximum");
+        assert!(
+            metadata.royalty_percentage <= 10000,
+            "royalty exceeds maximum"
+        );
 
         let counter: u64 = env
             .storage()
@@ -291,14 +313,17 @@ impl NftMetadataContract {
         final_metadata.token_id = token_id;
         final_metadata.created_at = env.ledger().timestamp();
 
-        env.storage().instance().set(&DataKey::NftMetadata(token_id), &final_metadata);
-        env.storage().instance().set(&DataKey::TokenOwner(token_id), &to);
-        env.storage().instance().set(&DataKey::TokenCounter, &token_id);
+        env.storage()
+            .instance()
+            .set(&DataKey::NftMetadata(token_id), &final_metadata);
+        env.storage()
+            .instance()
+            .set(&DataKey::TokenOwner(token_id), &to);
+        env.storage()
+            .instance()
+            .set(&DataKey::TokenCounter, &token_id);
 
-        env.events().publish(
-            (symbol_short!("mint"), token_id),
-            to,
-        );
+        env.events().publish((symbol_short!("mint"), token_id), to);
 
         token_id
     }
@@ -374,12 +399,12 @@ impl NftMetadataContract {
             metadata.image = image;
         }
 
-        env.storage().instance().set(&DataKey::NftMetadata(token_id), &metadata);
+        env.storage()
+            .instance()
+            .set(&DataKey::NftMetadata(token_id), &metadata);
 
-        env.events().publish(
-            (symbol_short!("updated"), token_id),
-            caller,
-        );
+        env.events()
+            .publish((symbol_short!("updated"), token_id), caller);
     }
 
     /// Add attribute to NFT
@@ -389,12 +414,7 @@ impl NftMetadataContract {
     /// * `caller` - Address calling the update
     /// * `token_id` - Token ID
     /// * `attribute` - Attribute to add
-    pub fn add_attribute(
-        env: Env,
-        caller: Address,
-        token_id: u64,
-        attribute: NftAttribute,
-    ) {
+    pub fn add_attribute(env: Env, caller: Address, token_id: u64, attribute: NftAttribute) {
         caller.require_auth();
 
         let owner: Address = env
@@ -415,12 +435,12 @@ impl NftMetadataContract {
 
         metadata.attributes.push_back(attribute);
 
-        env.storage().instance().set(&DataKey::NftMetadata(token_id), &metadata);
+        env.storage()
+            .instance()
+            .set(&DataKey::NftMetadata(token_id), &metadata);
 
-        env.events().publish(
-            (symbol_short!("attr_add"), token_id),
-            caller,
-        );
+        env.events()
+            .publish((symbol_short!("attr_add"), token_id), caller);
     }
 
     /// Set royalty information for a token
@@ -458,7 +478,9 @@ impl NftMetadataContract {
         metadata.royalty_percentage = percentage;
         metadata.royalty_recipient = recipient;
 
-        env.storage().instance().set(&DataKey::NftMetadata(token_id), &metadata);
+        env.storage()
+            .instance()
+            .set(&DataKey::NftMetadata(token_id), &metadata);
     }
 
     // ========================================================================
@@ -487,12 +509,7 @@ impl NftMetadataContract {
     /// * `from` - Current owner
     /// * `to` - New owner
     /// * `token_id` - Token to transfer
-    pub fn transfer(
-        env: Env,
-        from: Address,
-        to: Address,
-        token_id: u64,
-    ) {
+    pub fn transfer(env: Env, from: Address, to: Address, token_id: u64) {
         from.require_auth();
 
         let owner: Address = env
@@ -503,15 +520,17 @@ impl NftMetadataContract {
 
         assert!(from == owner, "not token owner");
 
-        env.storage().instance().set(&DataKey::TokenOwner(token_id), &to);
+        env.storage()
+            .instance()
+            .set(&DataKey::TokenOwner(token_id), &to);
 
         // Clear any approvals
-        env.storage().instance().remove(&DataKey::TokenApproval(token_id, from.clone()));
+        env.storage()
+            .instance()
+            .remove(&DataKey::TokenApproval(token_id, from.clone()));
 
-        env.events().publish(
-            (symbol_short!("transfer"), token_id),
-            (from, to),
-        );
+        env.events()
+            .publish((symbol_short!("transfer"), token_id), (from, to));
     }
 
     // ========================================================================
@@ -525,12 +544,7 @@ impl NftMetadataContract {
     /// * `owner` - Token owner
     /// * `approved` - Address to approve
     /// * `token_id` - Token ID
-    pub fn approve(
-        env: Env,
-        owner: Address,
-        approved: Address,
-        token_id: u64,
-    ) {
+    pub fn approve(env: Env, owner: Address, approved: Address, token_id: u64) {
         owner.require_auth();
 
         let token_owner: Address = env
@@ -541,12 +555,12 @@ impl NftMetadataContract {
 
         assert!(owner == token_owner, "not token owner");
 
-        env.storage().instance().set(&DataKey::TokenApproval(token_id, owner.clone()), &approved);
+        env.storage()
+            .instance()
+            .set(&DataKey::TokenApproval(token_id, owner.clone()), &approved);
 
-        env.events().publish(
-            (symbol_short!("approved"), token_id),
-            (owner, approved),
-        );
+        env.events()
+            .publish((symbol_short!("approved"), token_id), (owner, approved));
     }
 
     /// Set approval for all tokens
@@ -556,18 +570,18 @@ impl NftMetadataContract {
     /// * `owner` - Token owner
     /// * `operator` - Address to set approval for
     /// * `approved` - Whether to approve or revoke
-    pub fn set_approval_for_all(
-        env: Env,
-        owner: Address,
-        operator: Address,
-        approved: bool,
-    ) {
+    pub fn set_approval_for_all(env: Env, owner: Address, operator: Address, approved: bool) {
         owner.require_auth();
 
         if approved {
-            env.storage().instance().set(&DataKey::OperatorApproval(owner.clone(), operator.clone()), &true);
+            env.storage().instance().set(
+                &DataKey::OperatorApproval(owner.clone(), operator.clone()),
+                &true,
+            );
         } else {
-            env.storage().instance().remove(&DataKey::OperatorApproval(owner.clone(), operator.clone()));
+            env.storage()
+                .instance()
+                .remove(&DataKey::OperatorApproval(owner.clone(), operator.clone()));
         }
 
         env.events().publish(
@@ -663,7 +677,9 @@ impl NftMetadataContract {
         collection.description = description;
         collection.image = image;
 
-        env.storage().instance().set(&DataKey::CollectionMetadata, &collection);
+        env.storage()
+            .instance()
+            .set(&DataKey::CollectionMetadata, &collection);
     }
 
     /// Get total supply of tokens
@@ -690,7 +706,9 @@ impl NftMetadataContract {
     /// # Returns
     /// Whether the token exists
     pub fn exists(env: Env, token_id: u64) -> bool {
-        env.storage().instance().has(&DataKey::NftMetadata(token_id))
+        env.storage()
+            .instance()
+            .has(&DataKey::NftMetadata(token_id))
     }
 
     /// Get royalty info for a token
@@ -730,20 +748,20 @@ mod tests {
         let admin = Address::generate(&env);
         let id = env.register(NftMetadataContract, ());
         let client = NftMetadataContractClient::new(&env, &id);
-        
+
         client.initialize(
             &admin,
             &String::from_str(&env, "Test Collection"),
             &String::from_str(&env, "TEST"),
         );
-        
+
         (env, client, admin)
     }
 
     #[test]
     fn test_initialize() {
         let (env, client, admin) = setup();
-        
+
         let collection = client.get_collection();
         assert_eq!(collection.name, String::from_str(&env, "Test Collection"));
         assert_eq!(collection.symbol, String::from_str(&env, "TEST"));
@@ -754,7 +772,7 @@ mod tests {
     fn test_mint() {
         let (env, client, admin) = setup();
         let to = Address::generate(&env);
-        
+
         let token_id = client.mint(
             &admin,
             &to,
@@ -764,12 +782,12 @@ mod tests {
             &500u32, // 5% royalty
             &true,   // mutable
         );
-        
+
         assert_eq!(token_id, 1);
         assert_eq!(client.total_supply(), 1);
         assert_eq!(client.owner_of(&token_id), to);
         assert!(client.exists(&token_id));
-        
+
         let metadata = client.get_metadata(&token_id);
         assert_eq!(metadata.name, String::from_str(&env, "Test NFT"));
         assert_eq!(metadata.royalty_percentage, 500);
@@ -780,7 +798,7 @@ mod tests {
         let (env, client, admin) = setup();
         let to = Address::generate(&env);
         let new_owner = Address::generate(&env);
-        
+
         let token_id = client.mint(
             &admin,
             &to,
@@ -790,9 +808,9 @@ mod tests {
             &500u32,
             &true,
         );
-        
+
         client.transfer(&to, &new_owner, &token_id);
-        
+
         assert_eq!(client.owner_of(&token_id), new_owner);
     }
 
@@ -800,7 +818,7 @@ mod tests {
     fn test_update_metadata() {
         let (env, client, admin) = setup();
         let to = Address::generate(&env);
-        
+
         let token_id = client.mint(
             &admin,
             &to,
@@ -810,7 +828,7 @@ mod tests {
             &500u32,
             &true, // mutable
         );
-        
+
         client.update_metadata(
             &to,
             &token_id,
@@ -818,10 +836,13 @@ mod tests {
             &String::from_str(&env, "New Description"),
             &String::from_str(&env, "ipfs://new"),
         );
-        
+
         let metadata = client.get_metadata(&token_id);
         assert_eq!(metadata.name, String::from_str(&env, "New Name"));
-        assert_eq!(metadata.description, String::from_str(&env, "New Description"));
+        assert_eq!(
+            metadata.description,
+            String::from_str(&env, "New Description")
+        );
         assert_eq!(metadata.image, String::from_str(&env, "ipfs://new"));
     }
 
@@ -829,7 +850,7 @@ mod tests {
     fn test_royalty_info() {
         let (env, client, admin) = setup();
         let to = Address::generate(&env);
-        
+
         let token_id = client.mint(
             &admin,
             &to,
@@ -839,9 +860,9 @@ mod tests {
             &500u32, // 5% royalty
             &true,
         );
-        
+
         let (recipient, royalty) = client.royalty_info(&token_id, &10000);
-        
+
         assert_eq!(recipient, to);
         assert_eq!(royalty, 500); // 5% of 10000
     }
@@ -850,7 +871,7 @@ mod tests {
     fn test_add_attribute() {
         let (env, client, admin) = setup();
         let to = Address::generate(&env);
-        
+
         let token_id = client.mint(
             &admin,
             &to,
@@ -860,16 +881,16 @@ mod tests {
             &500u32,
             &true,
         );
-        
+
         let attr = NftAttribute {
             display_type: String::from_str(&env, ""),
             trait_type: String::from_str(&env, "Background"),
             value: String::from_str(&env, "Blue"),
             max_value: String::from_str(&env, ""),
         };
-        
+
         client.add_attribute(&to, &token_id, &attr);
-        
+
         let metadata = client.get_metadata(&token_id);
         assert_eq!(metadata.attributes.len(), 1);
     }
@@ -879,7 +900,7 @@ mod tests {
         let (env, client, admin) = setup();
         let to = Address::generate(&env);
         let spender = Address::generate(&env);
-        
+
         let token_id = client.mint(
             &admin,
             &to,
@@ -889,9 +910,9 @@ mod tests {
             &500u32,
             &true,
         );
-        
+
         client.approve(&to, &spender, &token_id);
-        
+
         assert!(client.is_approved(&token_id, &spender));
     }
 }

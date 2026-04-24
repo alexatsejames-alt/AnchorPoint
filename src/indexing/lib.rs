@@ -10,19 +10,19 @@ pub enum DataKey {
     /// Mapping: Address -> u32 (ID)
     /// Key: 'A' + Address
     AddrToId(Address),
-    
+
     /// User Data: ID -> UserData
     /// Key: 'U' + u32
     UserData(u32),
-    
+
     /// Bitmap for active status (64 users per entry)
     /// Key: 'B' + (u32 / 64)
     ActiveBitmap(u32),
-    
+
     /// Volatile Data: ID -> u64 (Timestamp) - Stored in Temporary storage
     /// Key: 'T' + u32
     LastActive(u32),
-    
+
     /// Global counter for assigning IDs
     Counter,
 }
@@ -51,20 +51,29 @@ impl IndexingContract {
     /// This ID will be used as a compact storage key for all other data.
     pub fn register_user(env: Env, user: Address) -> u32 {
         user.require_auth();
-        
-        if let Some(id) = env.storage().persistent().get::<_, u32>(&DataKey::AddrToId(user.clone())) {
+
+        if let Some(id) = env
+            .storage()
+            .persistent()
+            .get::<_, u32>(&DataKey::AddrToId(user.clone()))
+        {
             return id;
         }
 
         let id: u32 = env.storage().instance().get(&DataKey::Counter).unwrap_or(0);
-        env.storage().persistent().set(&DataKey::AddrToId(user), &id);
+        env.storage()
+            .persistent()
+            .set(&DataKey::AddrToId(user), &id);
         env.storage().instance().set(&DataKey::Counter, &(id + 1));
-        
+
         id
     }
 
     pub fn get_user_id(env: Env, user: Address) -> u32 {
-        env.storage().persistent().get(&DataKey::AddrToId(user)).expect("user not registered")
+        env.storage()
+            .persistent()
+            .get(&DataKey::AddrToId(user))
+            .expect("user not registered")
     }
 
     // ========================================================================
@@ -76,23 +85,33 @@ impl IndexingContract {
     pub fn set_active(env: Env, id: u32, active: bool) {
         let bitmap_index = id / 64;
         let bit_pos = id % 64;
-        
-        let mut bitmap: u64 = env.storage().persistent().get(&DataKey::ActiveBitmap(bitmap_index)).unwrap_or(0);
-        
+
+        let mut bitmap: u64 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::ActiveBitmap(bitmap_index))
+            .unwrap_or(0);
+
         if active {
             bitmap |= 1 << bit_pos;
         } else {
             bitmap &= !(1 << bit_pos);
         }
-        
-        env.storage().persistent().set(&DataKey::ActiveBitmap(bitmap_index), &bitmap);
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::ActiveBitmap(bitmap_index), &bitmap);
     }
 
     pub fn is_active(env: Env, id: u32) -> bool {
         let bitmap_index = id / 64;
         let bit_pos = id % 64;
-        
-        let bitmap: u64 = env.storage().persistent().get(&DataKey::ActiveBitmap(bitmap_index)).unwrap_or(0);
+
+        let bitmap: u64 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::ActiveBitmap(bitmap_index))
+            .unwrap_or(0);
         (bitmap & (1 << bit_pos)) != 0
     }
 
@@ -104,14 +123,19 @@ impl IndexingContract {
     /// Cheaper than Persistent storage for non-essential metrics.
     pub fn update_activity(env: Env, id: u32) {
         let now = env.ledger().timestamp();
-        env.storage().temporary().set(&DataKey::LastActive(id), &now);
-        
+        env.storage()
+            .temporary()
+            .set(&DataKey::LastActive(id), &now);
+
         // Optionally renew to keep it alive for another 10,000 blocks
         // env.storage().temporary().extend_ttl(&DataKey::LastActive(id), 10000, 10000);
     }
 
     pub fn get_last_active(env: Env, id: u32) -> u64 {
-        env.storage().temporary().get(&DataKey::LastActive(id)).unwrap_or(0)
+        env.storage()
+            .temporary()
+            .get(&DataKey::LastActive(id))
+            .unwrap_or(0)
     }
 
     // ========================================================================
@@ -121,14 +145,19 @@ impl IndexingContract {
     pub fn set_user_data(env: Env, id: u32, data: UserData) {
         // We use the u32 ID as part of the key instead of the full Address
         // This minimizes key entropy and XDR size in the ledger.
-        env.storage().persistent().set(&DataKey::UserData(id), &data);
+        env.storage()
+            .persistent()
+            .set(&DataKey::UserData(id), &data);
     }
 
     pub fn get_user_data(env: Env, id: u32) -> UserData {
-        env.storage().persistent().get(&DataKey::UserData(id)).unwrap_or(UserData {
-            balance: 0,
-            tier: 0,
-        })
+        env.storage()
+            .persistent()
+            .get(&DataKey::UserData(id))
+            .unwrap_or(UserData {
+                balance: 0,
+                tier: 0,
+            })
     }
 }
 
@@ -170,7 +199,7 @@ mod tests {
         assert!(client.is_active(&63));
         assert!(client.is_active(&64));
         assert!(!client.is_active(&1));
-        
+
         client.set_active(&63, &false);
         assert!(!client.is_active(&63));
     }

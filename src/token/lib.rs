@@ -34,16 +34,29 @@ impl TokenContract {
 
     pub fn mint(env: Env, to: Address, token_id: u64, amount: i128) {
         assert!(amount > 0, "amount must be positive");
-        let admin: Address = env.storage().instance().get(&DataKey::Admin).expect("admin not set");
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .expect("admin not set");
         admin.require_auth();
-        
+
         let bal = Self::balance_of(env.clone(), to.clone(), token_id);
-        env.storage().persistent().set(&DataKey::Balance(token_id, to.clone()), &(bal + amount));
-        
-        let supply: i128 = env.storage().instance().get(&DataKey::TotalSupply(token_id)).unwrap_or(0);
-        env.storage().instance().set(&DataKey::TotalSupply(token_id), &(supply + amount));
-        
-        env.events().publish((symbol_short!("mint"), to, token_id), amount);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Balance(token_id, to.clone()), &(bal + amount));
+
+        let supply: i128 = env
+            .storage()
+            .instance()
+            .get(&DataKey::TotalSupply(token_id))
+            .unwrap_or(0);
+        env.storage()
+            .instance()
+            .set(&DataKey::TotalSupply(token_id), &(supply + amount));
+
+        env.events()
+            .publish((symbol_short!("mint"), to, token_id), amount);
     }
 
     pub fn transfer(env: Env, from: Address, to: Address, token_id: u64, amount: i128) {
@@ -60,47 +73,73 @@ impl TokenContract {
     ) {
         from.require_auth();
         assert!(token_ids.len() == amounts.len(), "length mismatch");
-        
+
         for i in 0..token_ids.len() {
             let token_id = token_ids.get(i).unwrap();
             let amount = amounts.get(i).unwrap();
             Self::do_transfer(&env, from.clone(), to.clone(), token_id, amount);
         }
-        
-        env.events().publish((symbol_short!("batch_xf"), from, to), token_ids);
+
+        env.events()
+            .publish((symbol_short!("batch_xf"), from, to), token_ids);
     }
 
     pub fn approve(env: Env, owner: Address, spender: Address, token_id: u64, amount: i128) {
         owner.require_auth();
         assert!(amount >= 0, "amount must be non-negative");
-        env.storage().persistent().set(&DataKey::Allowance(token_id, owner.clone(), spender.clone()), &amount);
-        env.events().publish((symbol_short!("approve"), owner, spender, token_id), amount);
+        env.storage().persistent().set(
+            &DataKey::Allowance(token_id, owner.clone(), spender.clone()),
+            &amount,
+        );
+        env.events()
+            .publish((symbol_short!("approve"), owner, spender, token_id), amount);
     }
 
     pub fn set_approval_for_all(env: Env, owner: Address, operator: Address, approved: bool) {
         owner.require_auth();
         if approved {
-            env.storage().persistent().set(&DataKey::OperatorApproval(owner.clone(), operator.clone()), &true);
+            env.storage().persistent().set(
+                &DataKey::OperatorApproval(owner.clone(), operator.clone()),
+                &true,
+            );
         } else {
-            env.storage().persistent().remove(&DataKey::OperatorApproval(owner.clone(), operator.clone()));
+            env.storage()
+                .persistent()
+                .remove(&DataKey::OperatorApproval(owner.clone(), operator.clone()));
         }
-        env.events().publish((symbol_short!("app_all"), owner, operator), approved);
+        env.events()
+            .publish((symbol_short!("app_all"), owner, operator), approved);
     }
 
-    pub fn transfer_from(env: Env, spender: Address, from: Address, to: Address, token_id: u64, amount: i128) {
+    pub fn transfer_from(
+        env: Env,
+        spender: Address,
+        from: Address,
+        to: Address,
+        token_id: u64,
+        amount: i128,
+    ) {
         spender.require_auth();
-        
+
         // Check if operator approval exists first
-        let is_operator = env.storage().persistent().get::<_, bool>(&DataKey::OperatorApproval(from.clone(), spender.clone())).unwrap_or(false);
-        
+        let is_operator = env
+            .storage()
+            .persistent()
+            .get::<_, bool>(&DataKey::OperatorApproval(from.clone(), spender.clone()))
+            .unwrap_or(false);
+
         if !is_operator {
             let allowance = Self::allowance(env.clone(), from.clone(), spender.clone(), token_id);
             assert!(allowance >= amount, "insufficient allowance");
-            env.storage().persistent().set(&DataKey::Allowance(token_id, from.clone(), spender.clone()), &(allowance - amount));
+            env.storage().persistent().set(
+                &DataKey::Allowance(token_id, from.clone(), spender.clone()),
+                &(allowance - amount),
+            );
         }
 
         Self::do_transfer(&env, from, to, token_id, amount);
-        env.events().publish((symbol_short!("xfer_from"), spender, token_id), amount);
+        env.events()
+            .publish((symbol_short!("xfer_from"), spender, token_id), amount);
     }
 
     pub fn burn(env: Env, from: Address, token_id: u64, amount: i128) {
@@ -108,43 +147,77 @@ impl TokenContract {
         assert!(amount > 0, "amount must be positive");
         let bal = Self::balance_of(env.clone(), from.clone(), token_id);
         assert!(bal >= amount, "insufficient balance");
-        
-        env.storage().persistent().set(&DataKey::Balance(token_id, from.clone()), &(bal - amount));
-        let supply: i128 = env.storage().instance().get(&DataKey::TotalSupply(token_id)).unwrap_or(0);
-        env.storage().instance().set(&DataKey::TotalSupply(token_id), &(supply - amount));
-        
-        env.events().publish((symbol_short!("burn"), from, token_id), amount);
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::Balance(token_id, from.clone()), &(bal - amount));
+        let supply: i128 = env
+            .storage()
+            .instance()
+            .get(&DataKey::TotalSupply(token_id))
+            .unwrap_or(0);
+        env.storage()
+            .instance()
+            .set(&DataKey::TotalSupply(token_id), &(supply - amount));
+
+        env.events()
+            .publish((symbol_short!("burn"), from, token_id), amount);
     }
 
     pub fn set_token_metadata(env: Env, token_id: u64, uri: String) {
-        let admin: Address = env.storage().instance().get(&DataKey::Admin).expect("admin not set");
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .expect("admin not set");
         admin.require_auth();
-        env.storage().instance().set(&DataKey::TokenMetadata(token_id), &uri);
-        env.events().publish((symbol_short!("meta_set"), token_id), uri);
+        env.storage()
+            .instance()
+            .set(&DataKey::TokenMetadata(token_id), &uri);
+        env.events()
+            .publish((symbol_short!("meta_set"), token_id), uri);
     }
 
     pub fn get_token_metadata(env: Env, token_id: u64) -> String {
-        env.storage().instance().get(&DataKey::TokenMetadata(token_id)).unwrap_or(String::from_str(&env, ""))
+        env.storage()
+            .instance()
+            .get(&DataKey::TokenMetadata(token_id))
+            .unwrap_or(String::from_str(&env, ""))
     }
 
     pub fn balance_of(env: Env, owner: Address, token_id: u64) -> i128 {
-        env.storage().persistent().get(&DataKey::Balance(token_id, owner)).unwrap_or(0)
+        env.storage()
+            .persistent()
+            .get(&DataKey::Balance(token_id, owner))
+            .unwrap_or(0)
     }
 
     pub fn allowance(env: Env, owner: Address, spender: Address, token_id: u64) -> i128 {
-        env.storage().persistent().get(&DataKey::Allowance(token_id, owner, spender)).unwrap_or(0)
+        env.storage()
+            .persistent()
+            .get(&DataKey::Allowance(token_id, owner, spender))
+            .unwrap_or(0)
     }
 
     pub fn is_approved_for_all(env: Env, owner: Address, operator: Address) -> bool {
-        env.storage().persistent().get(&DataKey::OperatorApproval(owner, operator)).unwrap_or(false)
+        env.storage()
+            .persistent()
+            .get(&DataKey::OperatorApproval(owner, operator))
+            .unwrap_or(false)
     }
 
     pub fn total_supply(env: Env, token_id: u64) -> i128 {
-        env.storage().instance().get(&DataKey::TotalSupply(token_id)).unwrap_or(0)
+        env.storage()
+            .instance()
+            .get(&DataKey::TotalSupply(token_id))
+            .unwrap_or(0)
     }
 
     pub fn decimals(env: Env) -> u32 {
-        env.storage().instance().get(&DataKey::Decimals).unwrap_or(7)
+        env.storage()
+            .instance()
+            .get(&DataKey::Decimals)
+            .unwrap_or(7)
     }
 
     pub fn name(env: Env) -> String {
@@ -157,17 +230,30 @@ impl TokenContract {
 
     fn do_transfer(env: &Env, from: Address, to: Address, token_id: u64, amount: i128) {
         assert!(amount > 0, "amount must be positive");
-        let from_bal = env.storage().persistent().get::<_, i128>(&DataKey::Balance(token_id, from.clone())).unwrap_or(0);
+        let from_bal = env
+            .storage()
+            .persistent()
+            .get::<_, i128>(&DataKey::Balance(token_id, from.clone()))
+            .unwrap_or(0);
         assert!(from_bal >= amount, "insufficient balance");
-        
-        env.storage().persistent().set(&DataKey::Balance(token_id, from.clone()), &(from_bal - amount));
-        let to_bal = env.storage().persistent().get::<_, i128>(&DataKey::Balance(token_id, to.clone())).unwrap_or(0);
-        env.storage().persistent().set(&DataKey::Balance(token_id, to.clone()), &(to_bal + amount));
-        
-        env.events().publish((symbol_short!("transfer"), from, to, token_id), amount);
+
+        env.storage().persistent().set(
+            &DataKey::Balance(token_id, from.clone()),
+            &(from_bal - amount),
+        );
+        let to_bal = env
+            .storage()
+            .persistent()
+            .get::<_, i128>(&DataKey::Balance(token_id, to.clone()))
+            .unwrap_or(0);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Balance(token_id, to.clone()), &(to_bal + amount));
+
+        env.events()
+            .publish((symbol_short!("transfer"), from, to, token_id), amount);
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -214,20 +300,20 @@ mod tests {
         let (env, client, _) = setup();
         let alice = Address::generate(&env);
         let bob = Address::generate(&env);
-        
+
         client.mint(&alice, &1, &1000);
         client.mint(&alice, &2, &500);
-        
+
         let mut ids = soroban_sdk::Vec::new(&env);
         ids.push_back(1);
         ids.push_back(2);
-        
+
         let mut amounts = soroban_sdk::Vec::new(&env);
         amounts.push_back(300);
         amounts.push_back(200);
-        
+
         client.batch_transfer(&alice, &bob, &ids, &amounts);
-        
+
         assert_eq!(client.balance_of(&alice, &1), 700);
         assert_eq!(client.balance_of(&bob, &1), 300);
         assert_eq!(client.balance_of(&alice, &2), 300);
@@ -239,7 +325,7 @@ mod tests {
         let (env, client, _admin) = setup();
         let token_id = 1u64;
         let uri = String::from_str(&env, "ipfs://test");
-        
+
         client.set_token_metadata(&token_id, &uri);
         assert_eq!(client.get_token_metadata(&token_id), uri);
     }
@@ -250,12 +336,12 @@ mod tests {
         let alice = Address::generate(&env);
         let operator = Address::generate(&env);
         let bob = Address::generate(&env);
-        
+
         client.mint(&alice, &1, &1000);
         client.set_approval_for_all(&alice, &operator, &true);
-        
+
         assert!(client.is_approved_for_all(&alice, &operator));
-        
+
         client.transfer_from(&operator, &alice, &bob, &1, &300);
         assert_eq!(client.balance_of(&bob, &1), 300);
     }
@@ -291,7 +377,6 @@ mod tests {
         assert_eq!(client.total_supply(&token_id), 300);
     }
 }
-
 
 /// ============================================================================
 /// Formal Verification Invariants
@@ -342,7 +427,7 @@ mod invariants {
         let balance_sum = client.balance_of(&user1, &token_id)
             + client.balance_of(&user2, &token_id)
             + client.balance_of(&user3, &token_id);
-        
+
         // Invariant: sum of balances equals total supply
         assert_eq!(
             client.total_supply(&token_id),
@@ -362,18 +447,17 @@ mod invariants {
         client.mint(&alice, &token_id, &1000);
 
         let supply_before = client.total_supply(&token_id);
-        
+
         // Multiple transfers
         client.transfer(&alice, &bob, &token_id, &300);
         client.transfer(&bob, &carol, &token_id, &150);
         client.transfer(&alice, &carol, &token_id, &100);
 
         let supply_after = client.total_supply(&token_id);
-        
+
         // Invariant: transfers do not change total supply
         assert_eq!(
-            supply_before,
-            supply_after,
+            supply_before, supply_after,
             "INVARIANT VIOLATION: Supply changed during transfers"
         );
 
@@ -382,8 +466,7 @@ mod invariants {
             + client.balance_of(&bob, &token_id)
             + client.balance_of(&carol, &token_id);
         assert_eq!(
-            supply_after,
-            balance_sum,
+            supply_after, balance_sum,
             "INVARIANT VIOLATION: Balance sum doesn't match supply after transfers"
         );
     }
@@ -396,9 +479,9 @@ mod invariants {
 
         client.mint(&user, &token_id, &1000);
         let supply_before_burn = client.total_supply(&token_id);
-        
+
         client.burn(&user, &token_id, &300);
-        
+
         // Invariant: supply decreases by exactly the burned amount
         assert_eq!(
             client.total_supply(&token_id),
@@ -470,8 +553,7 @@ mod invariants {
 
         // Invariant: total value is conserved
         assert_eq!(
-            sum_before,
-            sum_after,
+            sum_before, sum_after,
             "INVARIANT VIOLATION: Value not conserved in transfer"
         );
 
@@ -505,7 +587,7 @@ mod invariants {
         client.approve(&owner, &spender, &token_id, &500);
 
         let allowance_before = client.allowance(&owner, &spender, &token_id);
-        
+
         client.transfer_from(&spender, &owner, &recipient, &token_id, &200);
 
         let allowance_after = client.allowance(&owner, &spender, &token_id);
@@ -551,7 +633,7 @@ mod invariants {
 
         // First transfer succeeds
         client.transfer(&alice, &bob, &token_id, &60);
-        
+
         // Alice now has 40, trying to spend 60 more should fail
         client.transfer(&alice, &carol, &token_id, &60);
     }
@@ -648,7 +730,7 @@ mod invariants {
     // PROPERTY-BASED INVARIANT TESTS
     // =========================================================================
     /// These tests verify invariants across sequences of random-ish operations.
-    
+
     #[test]
     fn property_sequence_invariant() {
         let (env, client, _) = setup_fresh();
@@ -658,18 +740,18 @@ mod invariants {
         let token_id = 1u64;
 
         // Sequence of operations that should maintain invariants
-        client.mint(&alice, &token_id, &1000);                              // Alice: 1000
-        client.mint(&bob, &token_id, &500);                                 // Bob: 500
-        client.transfer(&alice, &bob, &token_id, &200);                     // Alice: 800, Bob: 700
+        client.mint(&alice, &token_id, &1000); // Alice: 1000
+        client.mint(&bob, &token_id, &500); // Bob: 500
+        client.transfer(&alice, &bob, &token_id, &200); // Alice: 800, Bob: 700
         client.approve(&bob, &carol, &token_id, &300);
-        client.transfer_from(&carol, &bob, &alice, &token_id, &150);        // Alice: 950, Bob: 550
-        client.burn(&alice, &token_id, &100);                               // Total supply reduced by 100
+        client.transfer_from(&carol, &bob, &alice, &token_id, &150); // Alice: 950, Bob: 550
+        client.burn(&alice, &token_id, &100); // Total supply reduced by 100
 
         // Verify final invariants
-        let total_balance = client.balance_of(&alice, &token_id) 
-            + client.balance_of(&bob, &token_id) 
+        let total_balance = client.balance_of(&alice, &token_id)
+            + client.balance_of(&bob, &token_id)
             + client.balance_of(&carol, &token_id);
-        
+
         assert_eq!(
             client.total_supply(&token_id),
             total_balance,
@@ -723,7 +805,7 @@ mod invariants {
 
         // Transfer A -> B
         client.transfer(&alice, &bob, &token_id, &300);
-        
+
         // Transfer B -> A (reverse)
         client.transfer(&bob, &alice, &token_id, &300);
 
@@ -740,4 +822,3 @@ mod invariants {
         );
     }
 }
-

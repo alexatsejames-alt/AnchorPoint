@@ -20,7 +20,8 @@ impl BatchExecutor {
     pub fn execute_batch(env: Env, calls: Vec<Call>) -> Vec<Val> {
         let mut results = Vec::new(&env);
         for call in calls.iter() {
-            let result: Val = env.invoke_contract(&call.contract, &call.function, call.args.clone());
+            let result: Val =
+                env.invoke_contract(&call.contract, &call.function, call.args.clone());
             results.push_back(result);
         }
         results
