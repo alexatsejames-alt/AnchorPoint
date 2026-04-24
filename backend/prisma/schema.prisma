@@ -58,3 +58,48 @@ model KycCustomer {
 
   @@index([userId])
 }
+
+enum JobStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  FAILED
+  DELAYED
+  RETRYING
+}
+
+enum JobPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+model ContractJob {
+  id              String      @id @default(uuid())
+  jobId           String      @unique // BullMQ job ID
+  type            String      // CONTRACT_CALL, CONTRACT_DEPLOY, SETTLEMENT, etc.
+  priority        JobPriority @default(NORMAL)
+  status          JobStatus   @default(PENDING)
+  contractId      String?     // Stellar contract ID
+  functionName    String?     // Contract function to call
+  parameters      Json?       // Function parameters
+  result          Json?       // Job result
+  error           String?     // Error message if failed
+  attempts        Int         @default(0)
+  maxAttempts     Int         @default(3)
+  createdBy       String?     // User who created the job
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  startedAt       DateTime?
+  completedAt     DateTime?
+  failedAt        DateTime?
+  metadata        Json?       // Additional metadata
+
+  @@index([jobId])
+  @@index([type])
+  @@index([status])
+  @@index([priority])
+  @@index([createdBy])
+  @@index([createdAt])
+}
