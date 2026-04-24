@@ -17,6 +17,7 @@ import {
   connectionTracker,
 } from "./api/middleware/metrics.middleware";
 import { tracingMiddleware } from "./tracing/tracing.middleware";
+import { requestLogMiddleware } from "./api/middleware/request-log.middleware";
 
 const app = express();
 const PORT = config.PORT;
@@ -106,6 +107,7 @@ app.get("/api-docs.json", (req: Request, res: Response) => {
 // Apply metrics tracking middleware
 app.use(connectionTracker);
 app.use(metricsMiddleware);
+app.use(requestLogMiddleware);
 
 app.use("/api/transactions", transactionsRouter);
 
