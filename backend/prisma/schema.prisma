@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -70,4 +70,15 @@ model KycCustomer {
   updatedAt   DateTime  @updatedAt
 
   @@index([userId])
+}
+
+model SystemConfig {
+  id          String   @id @default(uuid())
+  version     Int      @unique
+  settings    String
+  isActive    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
 }

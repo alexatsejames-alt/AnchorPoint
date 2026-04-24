@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import logger from '../utils/logger';
+import configService from './config.service';
 
 export interface TransactionWebhookRecord {
   id: string;
@@ -111,13 +112,16 @@ const defaultHttpClient: WebhookHttpClient = async (url, init) => {
   };
 };
 
-export const loadWebhookConfigFromEnv = (): WebhookConfig => ({
-  url: process.env.WEBHOOK_URL,
-  secret: process.env.WEBHOOK_SECRET,
-  timeoutMs: Number.parseInt(process.env.WEBHOOK_TIMEOUT_MS || '5000', 10),
-  maxRetries: Number.parseInt(process.env.WEBHOOK_MAX_RETRIES || '3', 10),
-  retryDelayMs: Number.parseInt(process.env.WEBHOOK_RETRY_DELAY_MS || '500', 10),
-});
+export const loadWebhookConfigFromEnv = (): WebhookConfig => {
+  const cfg = configService.getConfig();
+  return {
+    url: cfg.WEBHOOK_URL,
+    secret: cfg.WEBHOOK_SECRET,
+    timeoutMs: cfg.WEBHOOK_TIMEOUT_MS,
+    maxRetries: cfg.WEBHOOK_MAX_RETRIES,
+    retryDelayMs: cfg.WEBHOOK_RETRY_DELAY_MS,
+  };
+};
 
 export const buildTransactionStatusChangedPayload = (
   transaction: TransactionWebhookRecord,
@@ -173,17 +177,35 @@ export class WebhookService {
 
   private readonly log: WebhookLogger;
 
+  private readonly injectedConfig?: WebhookConfig;
+
   constructor(
-    private readonly config: WebhookConfig = loadWebhookConfigFromEnv(),
+    injectedConfig?: WebhookConfig,
     dependencies: WebhookServiceDependencies = {}
   ) {
+    this.injectedConfig = injectedConfig;
     this.httpClient = dependencies.httpClient ?? defaultHttpClient;
     this.sleepFn = dependencies.sleep ?? sleep;
     this.log = dependencies.logger ?? logger;
   }
 
+  private getConfig(): WebhookConfig {
+    if (this.injectedConfig) {
+      return this.injectedConfig;
+    }
+    const cfg = configService.getConfig();
+    return {
+      url: cfg.WEBHOOK_URL,
+      secret: cfg.WEBHOOK_SECRET,
+      timeoutMs: cfg.WEBHOOK_TIMEOUT_MS,
+      maxRetries: cfg.WEBHOOK_MAX_RETRIES,
+      retryDelayMs: cfg.WEBHOOK_RETRY_DELAY_MS,
+    };
+  }
+
   isEnabled(): boolean {
-    return Boolean(this.config.url && this.config.secret);
+    const config = this.getConfig();
+    return Boolean(config.url && config.secret);
   }
 
   async sendTransactionStatusChanged(
@@ -217,19 +239,20 @@ export class WebhookService {
     payload: TransactionStatusChangedPayload,
     transactionId: string
   ): Promise<WebhookDeliveryResult> {
+    const config = this.getConfig();
     const requestBody = JSON.stringify(payload);
     let lastStatusCode: number | undefined;
     let lastResponseBody: string | undefined;
     let lastError: unknown;
 
-    for (let attempt = 1; attempt <= this.config.maxRetries + 1; attempt += 1) {
+    for (let attempt = 1; attempt <= config.maxRetries + 1; attempt += 1) {
       const timestamp = new Date().toISOString();
-      const signature = signWebhookPayload(requestBody, this.config.secret!, timestamp);
+      const signature = signWebhookPayload(requestBody, config.secret!, timestamp);
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), this.config.timeoutMs);
+      const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
 
       try {
-        const response = await this.httpClient(this.config.url!, {
+        const response = await this.httpClient(config.url!, {
           method: 'POST',
           headers: {
             'content-type': 'application/json',
@@ -260,7 +283,7 @@ export class WebhookService {
           };
         }
 
-        if (!RETRYABLE_STATUS_CODES.has(response.status) || attempt > this.config.maxRetries) {
+        if (!RETRYABLE_STATUS_CODES.has(response.status) || attempt > config.maxRetries) {
           this.log.warn('Webhook delivery failed without further retries', {
             transactionId,
             attempts: attempt,
@@ -278,7 +301,7 @@ export class WebhookService {
         clearTimeout(timeout);
         lastError = error;
 
-        if (attempt > this.config.maxRetries) {
+        if (attempt > config.maxRetries) {
           this.log.error('Webhook delivery exhausted retries after request error', {
             transactionId,
             attempts: attempt,
@@ -299,7 +322,7 @@ export class WebhookService {
 
     return {
       delivered: false,
-      attempts: this.config.maxRetries + 1,
+      attempts: config.maxRetries + 1,
       statusCode: lastStatusCode,
       responseBody: lastResponseBody,
       error: lastError instanceof Error ? lastError.message : 'Webhook delivery failed',
@@ -307,7 +330,8 @@ export class WebhookService {
   }
 
   private getRetryDelay(attempt: number): number {
-    return this.config.retryDelayMs * 2 ** (attempt - 1);
+    const config = this.getConfig();
+    return config.retryDelayMs * 2 ** (attempt - 1);
   }
 }
 

@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { randomBytes } from 'crypto';
 import { RedisService } from './redis.service';
+import configService from './config.service';
 
 export interface VerifiedToken {
   sub: string;
@@ -12,7 +13,6 @@ export interface Challenge {
   createdAt: number;
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || 'stellar-anchor-secret';
 const CHALLENGE_TTL_SECONDS = 300; // 5 minutes
 
 export const extractBearerToken = (authorization?: string): string | null => {
@@ -24,11 +24,11 @@ export const extractBearerToken = (authorization?: string): string | null => {
 export const signToken = (publicKey: string): string => {
   // SEP-10 convention (and how our middleware uses it):
   // the user's public key is stored in the JWT `sub` claim.
-  return jwt.sign({ sub: publicKey }, JWT_SECRET);
+  return jwt.sign({ sub: publicKey }, configService.getConfig().JWT_SECRET);
 };
 
 export const verifyToken = (token: string): VerifiedToken => {
-  const decoded = jwt.verify(token, JWT_SECRET) as { sub?: string };
+  const decoded = jwt.verify(token, configService.getConfig().JWT_SECRET) as { sub?: string };
   if (!decoded?.sub) throw new Error('Invalid token payload');
   return { sub: decoded.sub };
 };
