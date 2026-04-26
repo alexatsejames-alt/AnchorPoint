@@ -38,6 +38,15 @@ const envSchema = z.object({
   STELLAR_NETWORK_PASSPHRASE: z.string().default('Test SDF Network ; September 2015'),
   STELLAR_FEE_BUMP_SECRET: z.string().optional(),
   STELLAR_BASE_FEE: z.string().default('100'),
+  RELAYER_PUBLIC_KEY: z.string().optional(),
+  RELAYER_SECRET_KEY: z.string().optional(),
+  RELAYER_MAX_AMOUNT: z.string().default('1000000'),
+  RELAYER_ALLOWED_SPENDERS: z.string().optional(),
+  RELAYER_EXPIRY_WINDOW: z
+    .string()
+    .default('3600')
+    .transform((val: string) => parseInt(val, 10))
+    .pipe(z.number().int().min(0)),
 });
 
 const parsed = envSchema.safeParse({
