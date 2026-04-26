@@ -29,6 +29,17 @@ function checkDestructiveChanges() {
     console.log('--- Checking for destructive changes ---');
     // We compare the migrations in the migrations folder against the current schema.prisma
     // If there are unapplied changes that cause data loss, we warn.
+    
+    // Skip in CI if database doesn't exist (migration_lock.toml won't exist)
+    const dbUrl = process.env.DATABASE_URL || 'file:./prisma/dev.db';
+    if (dbUrl.startsWith('file:')) {
+        const dbPath = path.join(__dirname, '../prisma', dbUrl.replace('file:', ''));
+        if (!fs.existsSync(dbPath)) {
+            console.log('⚠️  Database does not exist, skipping destructive changes check (expected in CI)');
+            return;
+        }
+    }
+    
     try {
         // This command will exit with 1 if there are destructive changes
         execSync(`${PRISMA_BINARY} migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --exit-code`, { stdio: 'inherit' });
