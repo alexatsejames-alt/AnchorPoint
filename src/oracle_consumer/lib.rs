@@ -105,6 +105,8 @@ impl OracleConsumer {
         assert!(lookback_seconds > 0, "lookback window must be positive");
 
         let current_time = env.ledger().timestamp();
+        if current_time > price_info.timestamp.checked_add(max_age_seconds).expect("timestamp overflow") {
+            panic!("price record is too stale and cannot be used.");
         let latest = Self::get_price_record(&env, asset.clone());
         Self::assert_not_stale(&env, latest.timestamp, max_age_seconds);
 

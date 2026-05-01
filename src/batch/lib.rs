@@ -91,7 +91,7 @@ impl BatchExecutor {
             .unwrap_or(0);
         env.storage()
             .instance()
-            .set(&DataKey::Nonce(caller.clone()), &(current_nonce + 1));
+            .set(&DataKey::Nonce(caller.clone()), &current_nonce.checked_add(1).expect("nonce overflow"));
 
         let mut results = Vec::new(&env);
         for call in calls.iter() {

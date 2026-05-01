@@ -49,7 +49,7 @@ impl TokenContract {
         let bal = Self::balance_of(env.clone(), to.clone(), token_id);
         env.storage()
             .persistent()
-            .set(&DataKey::Balance(token_id, to.clone()), &(bal + amount));
+            .set(&DataKey::Balance(token_id, to.clone()), &bal.checked_add(amount).expect("balance overflow"));
 
         let supply: i128 = env
             .storage()
@@ -58,7 +58,7 @@ impl TokenContract {
             .unwrap_or(0);
         env.storage()
             .instance()
-            .set(&DataKey::TotalSupply(token_id), &(supply + amount));
+            .set(&DataKey::TotalSupply(token_id), &supply.checked_add(amount).expect("supply overflow"));
 
         // Topic: event name + token_id (u64 scalar); to + amount in data.
         env.events()
@@ -319,7 +319,7 @@ impl TokenContract {
 
         env.storage().persistent().set(
             &DataKey::Balance(token_id, from.clone()),
-            &(from_bal - amount),
+            &from_bal.checked_sub(amount).expect("balance underflow"),
         );
         let to_bal = env
             .storage()
@@ -331,7 +331,7 @@ impl TokenContract {
 
         env.storage()
             .persistent()
-            .set(&DataKey::Balance(token_id, to.clone()), &(to_bal + amount));
+            .set(&DataKey::Balance(token_id, to.clone()), &to_bal.checked_add(amount).expect("balance overflow"));
 
         // Topic: event name + token_id (u64 scalar); from + to + amount in data.
         env.events()
