@@ -76,8 +76,9 @@ impl OracleConsumer {
             .set(&DataKey::PriceRecord(asset.clone()), &price_info);
         Self::store_observation(&env, asset.clone(), price_info.clone());
 
+        // Topic: event name only; asset + price in data.
         env.events()
-            .publish((symbol_short!("price_upd"), asset), price_info.price);
+            .publish(symbol_short!("price_upd"), (asset, price_info.price));
 
         price_info
     }

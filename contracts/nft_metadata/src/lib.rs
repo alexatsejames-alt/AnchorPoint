@@ -35,6 +35,27 @@ pub enum DataKey {
     TokenApproval(u64, Address),
     /// Whether an operator is approved for all tokens of an owner
     OperatorApproval(Address, Address),
+    /// Branding / project metadata (description, icon_url, website)
+    ContractMeta,
+}
+
+// ============================================================================
+// Data Structures
+// ============================================================================
+
+/// On-chain branding metadata for the contract.
+///
+/// Stored independently of NFT logic so it can be updated at any time
+/// by the admin without touching token state.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct ContractMetadata {
+    /// Human-readable description of the contract.
+    pub description: String,
+    /// URL pointing to the project icon / logo.
+    pub icon_url: String,
+    /// Project or protocol website URL.
+    pub website: String,
 }
 
 // ============================================================================
@@ -174,6 +195,13 @@ impl NftMetadataContract {
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(&DataKey::CollectionMetadata, &collection);
         env.storage().instance().set(&DataKey::TokenCounter, &0u64);
+
+        // Initialise branding metadata with empty strings.
+        env.storage().instance().set(&DataKey::ContractMeta, &ContractMetadata {
+            description: String::from_str(&env, ""),
+            icon_url: String::from_str(&env, ""),
+            website: String::from_str(&env, ""),
+        });
     }
 
     // ========================================================================
@@ -246,8 +274,8 @@ impl NftMetadataContract {
         env.storage().instance().set(&DataKey::TokenCounter, &token_id);
 
         env.events().publish(
-            (symbol_short!("mint"), token_id),
-            to,
+            (symbol_short!("mint"), to, token_id),
+            (),
         );
 
         token_id
@@ -296,8 +324,8 @@ impl NftMetadataContract {
         env.storage().instance().set(&DataKey::TokenCounter, &token_id);
 
         env.events().publish(
-            (symbol_short!("mint"), token_id),
-            to,
+            (symbol_short!("mint"), to, token_id),
+            (),
         );
 
         token_id
@@ -377,8 +405,8 @@ impl NftMetadataContract {
         env.storage().instance().set(&DataKey::NftMetadata(token_id), &metadata);
 
         env.events().publish(
-            (symbol_short!("updated"), token_id),
-            caller,
+            (symbol_short!("updated"), caller, token_id),
+            (),
         );
     }
 
@@ -403,7 +431,13 @@ impl NftMetadataContract {
             .get(&DataKey::TokenOwner(token_id))
             .expect("token not found");
 
-        assert!(caller == owner, "only owner can update");
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .expect("admin not found");
+
+        assert!(caller == owner || caller == admin, "not authorized to update");
 
         let mut metadata: NftMetadata = env
             .storage()
@@ -413,12 +447,53 @@ impl NftMetadataContract {
 
         assert!(metadata.is_mutable, "metadata is not mutable");
 
-        metadata.attributes.push_back(attribute);
+        metadata.attributes.push_back(attribute.clone());
 
         env.storage().instance().set(&DataKey::NftMetadata(token_id), &metadata);
 
         env.events().publish(
-            (symbol_short!("attr_add"), token_id),
+            (symbol_short!("attr_add"), caller, token_id),
+            attribute,
+        );
+    }
+
+    /// Set all attributes for an NFT (replaces existing ones)
+    pub fn set_attrs(
+        env: Env,
+        caller: Address,
+        token_id: u64,
+        attributes: Vec<NftAttribute>,
+    ) {
+        caller.require_auth();
+
+        let owner: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::TokenOwner(token_id))
+            .expect("token not found");
+
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .expect("admin not found");
+
+        assert!(caller == owner || caller == admin, "not authorized to update");
+
+        let mut metadata: NftMetadata = env
+            .storage()
+            .instance()
+            .get(&DataKey::NftMetadata(token_id))
+            .expect("token not found");
+
+        assert!(metadata.is_mutable, "metadata is not mutable");
+
+        metadata.attributes = attributes;
+
+        env.storage().instance().set(&DataKey::NftMetadata(token_id), &metadata);
+
+        env.events().publish(
+            (symbol_short!("set_attrs"), token_id),
             caller,
         );
     }
@@ -509,8 +584,8 @@ impl NftMetadataContract {
         env.storage().instance().remove(&DataKey::TokenApproval(token_id, from.clone()));
 
         env.events().publish(
-            (symbol_short!("transfer"), token_id),
-            (from, to),
+            (symbol_short!("transfer"), from, to, token_id),
+            (),
         );
     }
 
@@ -542,8 +617,8 @@ impl NftMetadataContract {
         env.storage().instance().remove(&DataKey::TokenApproval(token_id, owner));
 
         env.events().publish(
-            (symbol_short!("burn"), token_id),
-            caller,
+            (symbol_short!("burn"), caller, token_id),
+            (),
         );
     }
     // ========================================================================
@@ -576,8 +651,8 @@ impl NftMetadataContract {
         env.storage().instance().set(&DataKey::TokenApproval(token_id, owner.clone()), &approved);
 
         env.events().publish(
-            (symbol_short!("approved"), token_id),
-            (owner, approved),
+            (symbol_short!("approved"), owner, approved, token_id),
+            (),
         );
     }
 
@@ -602,9 +677,12 @@ impl NftMetadataContract {
             env.storage().instance().remove(&DataKey::OperatorApproval(owner.clone(), operator.clone()));
         }
 
+        // Topic: event name only; owner + operator + approved in data.
         env.events().publish(
-            (symbol_short!("appr_all"), owner.clone()),
-            (operator, approved),
+            symbol_short!("appr_all"),
+            (owner, operator, approved),
+            (symbol_short!("appr_all"), owner.clone(), operator),
+            approved,
         );
     }
 
@@ -696,6 +774,50 @@ impl NftMetadataContract {
         collection.image = image;
 
         env.storage().instance().set(&DataKey::CollectionMetadata, &collection);
+    }
+
+    // ========================================================================
+    // Contract Metadata
+    // ========================================================================
+
+    /// Update the contract's branding metadata (admin only).
+    ///
+    /// All three fields are replaced atomically. Pass the current value for
+    /// any field you do not want to change.
+    ///
+    /// # Arguments
+    /// * `caller`      – Must be the contract admin
+    /// * `description` – New human-readable description
+    /// * `icon_url`    – New icon / logo URL
+    /// * `website`     – New project website URL
+    pub fn update_contract_meta(
+        env: Env,
+        caller: Address,
+        description: String,
+        icon_url: String,
+        website: String,
+    ) {
+        caller.require_auth();
+
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .expect("admin not found");
+        assert!(caller == admin, "only admin can update contract metadata");
+
+        let meta = ContractMetadata { description, icon_url, website };
+        env.storage().instance().set(&DataKey::ContractMeta, &meta);
+
+        env.events().publish((symbol_short!("meta_upd"),), meta);
+    }
+
+    /// Return the current contract branding metadata.
+    pub fn get_contract_meta(env: Env) -> ContractMetadata {
+        env.storage()
+            .instance()
+            .get(&DataKey::ContractMeta)
+            .expect("contract metadata not initialised")
     }
 
     /// Get total supply of tokens
@@ -925,5 +1047,44 @@ mod tests {
         client.approve(&to, &spender, &token_id);
         
         assert!(client.is_approved(&token_id, &spender));
+    }
+
+    #[test]
+    fn test_update_contract_meta() {
+        let (env, client, admin) = setup();
+
+        // Initial metadata should be empty strings.
+        let initial = client.get_contract_meta();
+        assert_eq!(initial.description, String::from_str(&env, ""));
+        assert_eq!(initial.icon_url, String::from_str(&env, ""));
+        assert_eq!(initial.website, String::from_str(&env, ""));
+
+        // Admin updates branding.
+        client.update_contract_meta(
+            &admin,
+            &String::from_str(&env, "NFT collection on Stellar"),
+            &String::from_str(&env, "https://example.com/icon.png"),
+            &String::from_str(&env, "https://example.com"),
+        );
+
+        let updated = client.get_contract_meta();
+        assert_eq!(updated.description, String::from_str(&env, "NFT collection on Stellar"));
+        assert_eq!(updated.icon_url, String::from_str(&env, "https://example.com/icon.png"));
+        assert_eq!(updated.website, String::from_str(&env, "https://example.com"));
+    }
+
+    #[test]
+    #[should_panic(expected = "only admin can update contract metadata")]
+    fn test_update_contract_meta_non_admin() {
+        let (env, client, _admin) = setup();
+        let non_admin = Address::generate(&env);
+
+        // Non-admin should be rejected.
+        client.update_contract_meta(
+            &non_admin,
+            &String::from_str(&env, "Hacked"),
+            &String::from_str(&env, ""),
+            &String::from_str(&env, ""),
+        );
     }
 }
