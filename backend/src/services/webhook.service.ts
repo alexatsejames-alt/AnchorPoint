@@ -248,6 +248,7 @@ export class WebhookService {
         span.setAttribute('webhook.event_type', payload.event);
         span.setAttribute('webhook.url', config.url || 'unknown');
         
+        const config = this.getConfig();
         const requestBody = JSON.stringify(payload);
         let lastStatusCode: number | undefined;
         let lastResponseBody: string | undefined;
@@ -336,6 +337,11 @@ export class WebhookService {
           error: lastError instanceof Error ? lastError.message : 'Webhook delivery failed',
         };
       },
+      SpanKind.CLIENT,
+      {
+        'webhook.url': configService.getConfig().webhook?.url,
+        'webhook.max_retries': configService.getConfig().webhook?.maxRetries,
+      }
       SpanKind.CLIENT
     );
   }
