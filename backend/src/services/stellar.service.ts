@@ -1,5 +1,6 @@
 import { Horizon, rpc, TransactionBuilder, Account, Networks, Memo, Operation, Keypair } from '@stellar/stellar-sdk';
 import { NetworkType, NETWORKS } from '../config/networks';
+import { config } from '../config/env';
 import { SignerInfo, SignatureInfo } from './auth.service';
 import configService from './config.service';
 
@@ -18,9 +19,13 @@ export interface AccountSigners {
 
 export class StellarService {
   private static instance: StellarService;
-  private currentNetwork: NetworkType = NetworkType.TESTNET;
+  private currentNetwork: NetworkType;
 
-  private constructor() {}
+  private constructor() {
+    // Initialize network from environment configuration
+    const networkFromEnv = config.STELLAR_NETWORK.toUpperCase();
+    this.currentNetwork = NetworkType[networkFromEnv as keyof typeof NetworkType] || NetworkType.TESTNET;
+  }
 
   public static getInstance(): StellarService {
     if (!StellarService.instance) {

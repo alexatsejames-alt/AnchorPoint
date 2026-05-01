@@ -32,15 +32,27 @@ const envSchema = z.object({
     .default('500')
     .transform((val: string) => parseInt(val, 10))
     .pipe(z.number().int().min(0)),
+  STELLAR_NETWORK: z.enum(['testnet', 'public', 'futurenet']).default('testnet'),
   RECURRING_PAYMENTS_WORKER_CRON: z.string().default('*/1 * * * *'),
   STELLAR_NETWORK: z.enum(['testnet', 'public']).default('testnet'),
   STELLAR_NETWORK_PASSPHRASE: z
     .string()
     .default('Test SDF Network ; September 2015'),
   STELLAR_HORIZON_URL: z.string().url().default('https://horizon-testnet.stellar.org'),
+  HORIZON_URL: z.string().url().default('https://horizon-testnet.stellar.org'),
+  STELLAR_NETWORK_PASSPHRASE: z.string().default('Test SDF Network ; September 2015'),
   STELLAR_FEE_BUMP_SECRET: z.string().optional(),
   STELLAR_DISTRIBUTION_SECRET: z.string().optional(),
   STELLAR_BASE_FEE: z.string().default('100'),
+  RELAYER_PUBLIC_KEY: z.string().optional(),
+  RELAYER_SECRET_KEY: z.string().optional(),
+  RELAYER_MAX_AMOUNT: z.string().default('1000000'),
+  RELAYER_ALLOWED_SPENDERS: z.string().optional(),
+  RELAYER_EXPIRY_WINDOW: z
+    .string()
+    .default('3600')
+    .transform((val: string) => parseInt(val, 10))
+    .pipe(z.number().int().min(0)),
   // Key Management Configuration
   KEY_MANAGEMENT_BACKEND: z.enum(['aws-kms', 'vault']).default('aws-kms'),
   AWS_KMS_KEY_ARN: z.string().optional(),

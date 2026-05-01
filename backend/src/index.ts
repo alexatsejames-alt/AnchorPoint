@@ -12,6 +12,7 @@ import sep38Router from './api/routes/sep38.route';
 import sep40Router from './api/routes/sep40.route';
 import infoRouter from './api/routes/info.route';
 import metricsRouter from './api/routes/metrics.route';
+import relayerRouter from './api/routes/relayer.route';
 import recurringPaymentsRouter from './api/routes/recurring-payments.route';
 import configRouter from './api/routes/config.route';
 import { errorHandler } from './api/middleware/error.middleware';
@@ -123,6 +124,9 @@ app.use('/api/config', configRouter);
 app.use('/api/reports', feeReportRouter);
 app.use('/api/events', eventRouter);
 app.use('/api/notifications', notificationsRouter);
+
+// Relayer API for gasless token approvals
+app.use('/api/relayer', relayerRouter);
 
 // Prometheus metrics endpoint
 app.use('/metrics', metricsRouter);

@@ -86,6 +86,7 @@ export const getChallenge = async (
     // with the challenge as a manage_data operation
     const response: ChallengeResponse = {
       transaction: challenge, // Simplified - should be a base64 encoded transaction
+      network_passphrase: config.STELLAR_NETWORK_PASSPHRASE
       network_passphrase: process.env?.STELLAR_NETWORK_PASSPHRASE || 'Test SDF Network ; September 2015',
       multiKeyChallenge
     // Use configured anchor key or generate a default one for demo
