@@ -117,7 +117,7 @@ impl RandomNumberGenerator {
             .get(&DataKey::RoundCounter)
             .unwrap_or(0);
 
-        let new_round_id = counter + 1;
+        let new_round_id = counter.checked_add(1).expect("round id overflow");
 
         env.storage()
             .instance()
@@ -193,8 +193,13 @@ impl RandomNumberGenerator {
 
         env.storage()
             .instance()
-            .set(&DataKey::CommitCount(round_id), &(commit_count + 1));
+            .set(&DataKey::CommitCount(round_id), &commit_count.checked_add(1).expect("commit count overflow"));
 
+        // Topic: event name + round_id (u32 scalar); user Address in data.
+        env.events().publish(
+            (symbol_short!("commit"), round_id),
+            (user, commitment),
+        );
         env.events()
             .publish((symbol_short!("commit"), round_id, user), commitment);
     }
@@ -320,11 +325,12 @@ impl RandomNumberGenerator {
 
         env.storage()
             .instance()
-            .set(&DataKey::RevealCount(round_id), &(reveal_count + 1));
+            .set(&DataKey::RevealCount(round_id), &reveal_count.checked_add(1).expect("reveal count overflow"));
 
+        // Topic: event name + round_id (u32 scalar); user Address in data.
         env.events().publish(
-            (symbol_short!("reveal"), round_id, user),
-            symbol_short!("done"),
+            (symbol_short!("reveal"), round_id),
+            user,
         );
     }
 
